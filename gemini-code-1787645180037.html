@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ 衛生小戰士 🛡️</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', 'Microsoft JhengHei', sans-serif;
+            text-align: center;
+            background-color: #e0f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { color: #00838f; }
+        p { color: #006064; font-size: 16px; }
+        #game-container {
+            margin: 0 auto;
+            display: inline-block;
+        }
+        #score-board {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00695c;
+            margin-bottom: 10px;
+        }
+        canvas {
+            background-color: #ffffff;
+            border: 4px solid #4dd0e1;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            cursor: none; /* 隱藏鼠標，用籃子代替 */
+            touch-action: none; /* 防止手機/平板滑動頁面 */
+        }
+        #restartBtn {
+            display: none;
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #00acc1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #restartBtn:hover { background-color: #00838f; }
+    </style>
+</head>
+<body>
+
+    <h1>🛡️ 衛生小戰士 🛡️</h1>
+    <p>💡 玩法：左右移動籃子，接住 🧼 和 🪥，避開 🦠！</p>
+    
+    <div id="game-container">
+        <div id="score-board">分數: <span id="score">0</span> | 生命: <span id="lives">3</span></div>
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <br>
+        <button id="restartBtn" onclick="resetGame()">再玩一次</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const livesElement = document.getElementById("lives");
+        const restartBtn = document.getElementById("restartBtn");
+
+        // 遊戲變數
+        let score = 0;
+        let lives = 3;
+        let gameActive = true;
+        let animationId;
+
+        // 玩家 (籃子)
+        const player = { x: 175, y: 440, width: 60, height: 60, emoji: "🧺" };
+
+        // 掉落物品設定
+        let items = [];
+        const goodItems = ["🧼", "🪥", "🚿", "🧴"];
+        const badItems = ["🦠", "🪰", "💩"];
+
+        function createItem() {
+            if (!gameActive) return;
+            const isGood = Math.random() > 0.4; // 60% 機率是好東西
+            const itemEmoji = isGood 
+                ? goodItems[Math.floor(Math.random() * goodItems.length)] 
+                : badItems[Math.floor(Math.random() * badItems.length)];
+            
+            items.push({
+                x: Math.random() * (canvas.width - 40),
+                y: -40,
+                size: 40,
+                speed: Math.random() * 2 + 2, // 速度 2 到 4
+                emoji: itemEmoji,
+                isGood: isGood
+            });
+        }
+
+        function drawPlayer() {
+            ctx.font = "50px Arial";
+            ctx.fillText(player.emoji, player.x, player.y + 40);
+        }
+
+        function updateAndDrawItems() {
+            for (let i = 0; i < items.length; i++) {
+                let item = items[i];
+                item.y += item.speed;
+
+                ctx.font = "40px Arial";
+                ctx.fillText(item.emoji, item.x, item.y + 30);
+
+                // 碰撞檢測 (簡單的邊界框)
+                if (item.y + item.size > player.y && 
+                    item.y < player.y + player.height && 
+                    item.x + item.size > player.x && 
+                    item.x < player.x + player.width) {
+                    
+                    if (item.isGood) {
+                        score += 10;
+                    } else {
+                        lives -= 1;
+                    }
+                    items.splice(i, 1);
+                    i--;
+                    updateScoreboard();
+                    continue;
+                }
+
+                // 物品掉出螢幕
+                if (item.y > canvas.height) {
+                    items.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function updateScoreboard() {
+            scoreElement.innerText = score;
+            livesElement.innerText = lives;
+            if (lives <= 0) {
+                gameOver();
+            }
+        }
+
+        function gameOver() {
+            gameActive = false;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+            ctx.font = "30px 'Microsoft JhengHei'";
+            ctx.textAlign = "center";
+            ctx.fillText("遊戲結束!", canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillText("你的分數: " + score, canvas.width / 2, canvas.height / 2 + 20);
+            ctx.textAlign = "left"; // 重置
+            restartBtn.style.display = "inline-block";
+        }
+
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            items = [];
+            gameActive = true;
+            restartBtn.style.display = "none";
+            updateScoreboard();
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawPlayer();
+            updateAndDrawItems();
+            
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // 控制：滑鼠移動
+        canvas.addEventListener("mousemove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            player.x = mouseX - player.width / 2;
+            
+            // 邊界限制
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        });
+
+        // 控制：觸控螢幕 (支援 iPad/手機)
+        canvas.addEventListener("touchmove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            let touchX = e.touches[0].clientX - rect.left;
+            player.x = touchX - player.width / 2;
+            
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        });
+
+        // 定期產生新物品
+        setInterval(createItem, 1000); // 每秒產生一個
+
+        // 啟動遊戲
+        gameLoop();
+    </script>
+</body>
+</html>
